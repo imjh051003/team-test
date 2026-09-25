@@ -31,21 +31,23 @@ const questions: Question[] = [
     question: "팀플이 시작됐다. 이 사람은 가장 먼저 뭘 할 것 같아?",
     type: "single",
     options: [
-      "아이디어부터 던진다",
-      "자료부터 찾아본다",
-      "해야 할 일을 정리한다",
-      "사람들 의견부터 듣는다",
+      "일정과 마감일을 정리하고 계획을 세운다.",
+      "주제나 새로운 아이디어를 먼저 제안한다.",
+      "관련 사례와 자료를 먼저 조사한다.",
+      "해야 할 일을 정리하고 역할을 나눈다.",
+      "팀원들의 의견과 선호를 먼저 물어본다.",
     ],
   },
   {
     id: 2,
-    question: "회의가 10분째 제자리걸음이다. 이 사람은?",
+    question: "회의가 10분째 제자리걸음이다. 이 사람은 어떻게 생각할까?",
     type: "single",
     options: [
-      "새로운 아이디어를 던진다",
-      "문제를 다시 정리한다",
-      "일단 하나를 결정하자고 한다",
-      "다른 사람들의 의견을 정리한다",
+      "“왜지?” 뭐 때문에 막혔는지 원인부터 생각한다.",
+      "“뭐가 더 낫지?” 각 의견의 장단점을 따져본다.",
+      "“둘 다 괜찮은데?” 서로의 의견을 합칠 방법을 생각한다.",
+      "“분위기 안 좋은데…” 어떻게 분위기를 풀지 생각한다.",
+      "“다른 방법 없나?” 새로운 해결 방법을 계속 생각한다.",
     ],
   },
   {
@@ -54,8 +56,8 @@ const questions: Question[] = [
     type: "ranked",
     options: [
       "아이디어를 낸다",
-      "질문을 많이 한다",
-      "다른 의견을 정리한다",
+      "필요한 정보나 모르는 부분을 바로 확인한다",
+      "여러 의견의 공통점과 차이를 정리한다",
       "현실적으로 가능한지 판단한다",
       "조용히 듣다가 핵심을 말한다",
     ],
@@ -66,7 +68,7 @@ const questions: Question[] = [
       "팀플 도중 예상치 못한 문제가 생겼다. 이 사람은 가장 먼저 어떻게 할 것 같아?",
     type: "ranked",
     options: [
-      "일단 해결할 방법부터 찾아본다",
+      "필요한 일을 먼저 찾아서 움직인다",
       "왜 문제가 생겼는지 원인부터 파악한다",
       "팀원들과 해결 방법을 같이 논의한다",
       "기존 계획을 수정해서 새로운 방향을 잡는다",
@@ -78,10 +80,10 @@ const questions: Question[] = [
     question: "팀플 마감 하루 전, 이 사람에게 가장 기대하게 되는 건?",
     type: "ranked",
     options: [
-      "빠진 부분을 귀신같이 찾아낸다",
+      "부족한 부분이 보이면 필요한 내용을 찾아 빠르게 보완한다",
       "어떻게든 자기 몫은 끝낸다",
-      "다 같이 끝낼 수 있게 챙긴다",
-      "결과물을 한 단계 더 다듬는다",
+      "진행 상황을 공유하며 다 같이 끝낼 수 있게 조율한다",
+      "필요한 수정사항을 바로 반영해 결과물을 완성한다",
       "막힌 부분의 해결책을 가져온다",
       "지친 팀 분위기를 살려준다",
     ],
@@ -95,8 +97,8 @@ const questions: Question[] = [
       "좋은 아이디어를 내서",
       "소통이 편해서",
       "문제 해결을 잘해서",
-      "결과물의 완성도를 높여서",
-      "팀 분위기를 좋게 만들어서",
+      "예상치 못한 상황에도 잘 대처해서",
+      "팀을 잘 이끌어서",
     ],
   },
   {
@@ -149,6 +151,8 @@ export default function TestPage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [step, setStep] = useState(START_STEP);
+  const [respondentName, setRespondentName] = useState("");
+  const [isAnonymous, setIsAnonymous] = useState(false);
   const [projectName, setProjectName] = useState("");
   const [noProject, setNoProject] = useState(false);
   const [answers, setAnswers] = useState<Answers>({});
@@ -225,6 +229,8 @@ export default function TestPage({
     ? answers[currentQuestion.id]
     : undefined;
 
+  const canStart = isAnonymous || respondentName.trim().length > 0;
+
   const projectIsComplete = noProject || projectName.trim().length > 0;
 
   const answerIsComplete = currentQuestion
@@ -252,27 +258,63 @@ export default function TestPage({
     setError("");
   };
 
-  const selectRankedAnswer = (
-    questionId: number,
-    rank: "first" | "second",
-    option: string,
-  ) => {
-    setAnswers((previous) => {
-      const oldAnswer = previous[questionId] ?? {
-        first: "",
-        second: null,
-      };
+  const selectRankedOption = (questionId: number, option: string) => {
+  setAnswers((previous) => {
+    const oldAnswer = previous[questionId] ?? {
+      first: "",
+      second: null,
+    };
 
+    // 이미 1순위로 선택한 항목을 다시 누르면 선택 취소
+    if (oldAnswer.first === option) {
       return {
         ...previous,
         [questionId]: {
-          ...oldAnswer,
-          [rank]: option,
+          first: "",
+          second: oldAnswer.second,
         },
       };
-    });
-    setError("");
-  };
+    }
+
+    // 이미 2순위로 선택한 항목을 다시 누르면 선택 취소
+    if (oldAnswer.second === option) {
+      return {
+        ...previous,
+        [questionId]: {
+          first: oldAnswer.first,
+          second: null,
+        },
+      };
+    }
+
+    // 첫 번째 클릭 → 1순위
+    if (!oldAnswer.first) {
+      return {
+        ...previous,
+        [questionId]: {
+          first: option,
+          second: oldAnswer.second,
+        },
+      };
+    }
+
+    // 두 번째 클릭 → 2순위
+    if (!oldAnswer.second) {
+      return {
+        ...previous,
+        [questionId]: {
+          first: oldAnswer.first,
+          second: option,
+        },
+      };
+    }
+
+    // 이미 2개를 선택했다면 아무 변화 없음
+    return previous;
+  });
+
+  setError("");
+};
 
   const goToNextQuestion = () => {
     if (!answerIsComplete) return;
@@ -288,6 +330,11 @@ export default function TestPage({
 
   const handleSubmit = async () => {
     if (submitting || submitted || !test) return;
+
+    if (!isAnonymous && !respondentName.trim()) {
+      setError("이름 또는 닉네임을 입력해주세요.");
+      return;
+    }
 
     const allAnswersAreComplete = questions.every((question) => {
       const answer = answers[question.id];
@@ -320,6 +367,7 @@ const { error: responseError } = await supabase
     id: responseId,
     test_id: test.id,
     project_name: noProject ? "없음" : projectName.trim(),
+    respondent_name: isAnonymous ? null : respondentName.trim(),
   });
 
       if (responseError) {
@@ -435,15 +483,59 @@ const { error: responseError } = await supabase
             <span className="font-medium text-slate-700">{test.nickname}</span>
             의 모습을 알려주세요.
           </p>
-          <div className="mt-5 inline-flex items-center rounded-full bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700">
-            🔒 익명으로 진행돼요
-          </div>
+        </div>
+
+        <div className="mt-7">
+          <label
+            htmlFor="respondent-name"
+            className="mb-2 block text-sm font-semibold text-slate-700"
+          >
+            이름 또는 닉네임
+          </label>
+          <input
+            id="respondent-name"
+            type="text"
+            value={respondentName}
+            maxLength={20}
+            disabled={isAnonymous}
+            onChange={(event) => {
+              setRespondentName(event.target.value);
+              setError("");
+            }}
+            placeholder="이름을 입력해주세요"
+            className="w-full rounded-xl border border-slate-200 px-4 py-3 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 disabled:placeholder:text-slate-300"
+          />
+
+          <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 px-4 py-3.5 transition hover:bg-slate-50">
+            <input
+              type="checkbox"
+              checked={isAnonymous}
+              onChange={(event) => {
+                setIsAnonymous(event.target.checked);
+                setError("");
+              }}
+              className="mt-0.5 h-5 w-5 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+            />
+            <span>
+              <span className="block font-medium text-slate-700">
+                익명으로 응답하기
+              </span>
+              <span className="mt-1 block text-sm leading-5 text-slate-400">
+                이름을 공개하지 않고 응답해요.
+              </span>
+            </span>
+          </label>
         </div>
 
         <button
           type="button"
-          onClick={() => setStep(PROJECT_STEP)}
-          className="mt-8 w-full rounded-xl bg-indigo-600 px-4 py-3.5 font-semibold text-white transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:ring-offset-2"
+          onClick={() => {
+            if (!canStart) return;
+            setError("");
+            setStep(PROJECT_STEP);
+          }}
+          disabled={!canStart}
+          className="mt-8 w-full rounded-xl bg-indigo-600 px-4 py-3.5 font-semibold text-white transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-indigo-300"
         >
           시작하기
         </button>
@@ -571,38 +663,62 @@ const { error: responseError } = await supabase
             })}
           </div>
         ) : (
-          <div className="mt-6 space-y-7">
-            <RankedChoiceGroup
-              label="1순위"
-              badgeClassName="bg-indigo-600 text-white"
-              options={currentQuestion.options}
-              selectedValue={currentAnswer?.first ?? ""}
-              unavailableValue={currentAnswer?.second ?? ""}
-              onSelect={(option) =>
-                selectRankedAnswer(currentQuestion.id, "first", option)
-              }
-              optionClassName={optionClassName}
-            />
+  <div className="mt-6">
+    <p className="mb-4 text-sm text-slate-500">
+      먼저 선택한 답변이 1순위, 다음 답변이 2순위가 돼요.
+    </p>
 
-            <RankedChoiceGroup
-              label="2순위"
-              badgeClassName="bg-violet-100 text-violet-700"
-              options={currentQuestion.options}
-              selectedValue={currentAnswer?.second ?? ""}
-              unavailableValue={currentAnswer?.first ?? ""}
-              onSelect={(option) =>
-                selectRankedAnswer(currentQuestion.id, "second", option)
-              }
-              optionClassName={optionClassName}
-            />
-          </div>
-        )}
+    <div className="space-y-3">
+      {currentQuestion.options.map((option) => {
+        const isFirst = currentAnswer?.first === option;
+        const isSecond = currentAnswer?.second === option;
 
-        {error && (
-          <div className="mt-5 rounded-xl bg-red-50 px-4 py-3" role="alert">
-            <p className="text-sm text-red-600">{error}</p>
-          </div>
-        )}
+        const hasTwoChoices =
+          Boolean(currentAnswer?.first) &&
+          Boolean(currentAnswer?.second);
+
+        const disabled =
+          hasTwoChoices && !isFirst && !isSecond;
+
+        return (
+          <button
+            key={option}
+            type="button"
+            disabled={disabled}
+            onClick={() =>
+              selectRankedOption(currentQuestion.id, option)
+            }
+            className={`w-full rounded-xl border px-4 py-3.5 text-left text-sm font-medium transition sm:text-base ${
+              isFirst
+                ? "border-indigo-600 bg-indigo-50 text-indigo-700 ring-2 ring-indigo-100"
+                : isSecond
+                  ? "border-violet-500 bg-violet-50 text-violet-700 ring-2 ring-violet-100"
+                  : disabled
+                    ? "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300"
+                    : "border-slate-200 bg-white text-slate-700 hover:border-indigo-300 hover:bg-indigo-50/50"
+            }`}
+          >
+            <span className="flex items-center justify-between gap-3">
+              <span>{option}</span>
+
+              {isFirst && (
+                <span className="rounded-full bg-indigo-600 px-2.5 py-1 text-xs font-bold text-white">
+                  1순위
+                </span>
+              )}
+
+              {isSecond && (
+                <span className="rounded-full bg-violet-600 px-2.5 py-1 text-xs font-bold text-white">
+                  2순위
+                </span>
+              )}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  </div>
+)}
 
         <div className="mt-8 grid grid-cols-2 gap-3">
           <button
@@ -632,63 +748,6 @@ const { error: responseError } = await supabase
   );
 }
 
-function RankedChoiceGroup({
-  label,
-  badgeClassName,
-  options,
-  selectedValue,
-  unavailableValue,
-  onSelect,
-  optionClassName,
-}: {
-  label: string;
-  badgeClassName: string;
-  options: string[];
-  selectedValue: string;
-  unavailableValue: string;
-  onSelect: (option: string) => void;
-  optionClassName: (selected: boolean, disabled?: boolean) => string;
-}) {
-  return (
-    <section>
-      <div className="mb-3 flex items-center gap-2">
-        <span
-          className={`rounded-full px-3 py-1 text-xs font-bold ${badgeClassName}`}
-        >
-          {label}
-        </span>
-        <span className="text-xs text-slate-400">하나를 선택해주세요</span>
-      </div>
-
-      <div className="space-y-2.5">
-        {options.map((option) => {
-          const selected = selectedValue === option;
-          const disabled = unavailableValue === option;
-
-          return (
-            <button
-              key={option}
-              type="button"
-              aria-pressed={selected}
-              disabled={disabled}
-              onClick={() => onSelect(option)}
-              className={optionClassName(selected, disabled)}
-            >
-              <span className="flex items-center justify-between gap-3">
-                <span>{option}</span>
-                {selected && (
-                  <span className="shrink-0 text-sm font-bold text-indigo-600">
-                    ✓
-                  </span>
-                )}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
 
 function PageShell({ children }: { children: ReactNode }) {
   return (
