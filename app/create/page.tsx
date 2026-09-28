@@ -11,6 +11,81 @@ type CreatedTest = {
   created_at: string;
 };
 
+type RecentTest = {
+  id: string;
+  nickname: string;
+  result_key: string;
+  created_at: string;
+};
+
+const RECENT_TESTS_KEY = "recentTests";
+const MAX_RECENT_TESTS = 5;
+
+// localStorage에 저장된 값이 올바른 RecentTest 형태인지 확인
+const isRecentTest = (value: unknown): value is RecentTest => {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  const test = value as Partial<RecentTest>;
+
+  return (
+    typeof test.id === "string" &&
+    test.id.length > 0 &&
+    typeof test.nickname === "string" &&
+    typeof test.result_key === "string" &&
+    test.result_key.length > 0 &&
+    typeof test.created_at === "string" &&
+    test.created_at.length > 0 &&
+    !Number.isNaN(Date.parse(test.created_at))
+  );
+};
+
+// 최근 만든 테스트를 localStorage에 저장
+const saveRecentTest = (test: RecentTest) => {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    const storedValue = window.localStorage.getItem(RECENT_TESTS_KEY);
+
+    let previousTests: RecentTest[] = [];
+
+    if (storedValue) {
+      try {
+        const parsedValue: unknown = JSON.parse(storedValue);
+
+        if (Array.isArray(parsedValue)) {
+          previousTests = parsedValue.filter(isRecentTest);
+        }
+      } catch (parseError) {
+        console.error("최근 테스트 목록 파싱 오류:", parseError);
+        previousTests = [];
+      }
+    }
+
+    // 같은 id가 있다면 기존 항목을 제거한 뒤
+    // 새 테스트를 배열 맨 앞에 추가
+    const testsWithoutDuplicate = previousTests.filter(
+      (recentTest) => recentTest.id !== test.id
+    );
+
+    const nextTests = [test, ...testsWithoutDuplicate].slice(
+      0,
+      MAX_RECENT_TESTS
+    );
+
+    window.localStorage.setItem(
+      RECENT_TESTS_KEY,
+      JSON.stringify(nextTests)
+    );
+  } catch (storageError) {
+    // localStorage 저장 실패가 테스트 생성 실패로 이어지지 않도록 처리
+    console.error("최근 테스트 저장 오류:", storageError);
+  }
+};
+
 export default function CreatePage() {
   const router = useRouter();
 
@@ -60,18 +135,25 @@ export default function CreatePage() {
         .select("id, nickname, result_key, created_at")
         .single();
 
-     if (insertError) {
-  console.error(insertError);
-  setError("테스트를 만드는 중 문제가 발생했어요. 다시 시도해주세요.");
-  return;
-}
+      if (insertError) {
+        console.error(insertError);
+        setError("테스트를 만드는 중 문제가 발생했어요. 다시 시도해주세요.");
+        return;
+      }
 
       if (!data) {
         setError("테스트 정보를 불러오지 못했어요. 다시 시도해주세요.");
         return;
       }
 
-      setCreatedTest(data);
+      const newTest = data as CreatedTest;
+
+      // 기존 생성 완료 처리
+      setCreatedTest(newTest);
+
+      // 최근 만든 테스트에 저장
+      // 저장에 실패해도 Supabase 테스트 생성에는 영향을 주지 않음
+      saveRecentTest(newTest);
     } catch (error) {
       console.error(error);
       setError("잠시 문제가 발생했어요. 다시 시도해주세요.");
@@ -80,7 +162,6 @@ export default function CreatePage() {
     }
   };
 
-  // 아직 테스트가 만들어지지 않은 경우
   const origin =
     typeof window !== "undefined" ? window.location.origin : "";
 
@@ -126,25 +207,32 @@ export default function CreatePage() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-10">
-      <div className="w-full max-w-md">
-        <div className="rounded-3xl bg-white p-6 shadow-sm sm:p-8">
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-50 px-4 py-10">
+      {/* 배경 장식 */}
+      <div className="pointer-events-none absolute left-1/2 top-0 h-72 w-72 -translate-x-1/2 -translate-y-1/2 rounded-full bg-indigo-100/50 blur-3xl" />
 
-          {/* 테스트 생성 완료 전 */}
-          {!createdTest ? (
+      <div className="relative w-full max-w-md">
+        <div className="rounded-[28px] border border-slate-100 bg-white p-6 shadow-[0_10px_40px_rgba(15,23,42,0.06)] sm:p-8">
+          {/* 테스트 생성 전 */}
+          {!createdTest && (
             <>
-              {/* 제목 */}
               <div className="mb-8 text-center">
-                <div className="mb-3 text-4xl">👥</div>
+                <div className="mb-5 flex justify-center">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-50 text-2xl">
+                    ✏️
+                  </div>
+                </div>
 
-                <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">
-                  내 팀플 테스트 만들기
+                <h1 className="text-2xl font-bold leading-tight text-slate-900 sm:text-3xl">
+                  어떤 이름으로
+                  <br />
+                  테스트를 만들까요?
                 </h1>
 
-                <p className="mt-3 text-sm leading-6 text-slate-500 sm:text-base">
-                  함께한 팀원들은 나를 어떻게 보고 있을까요?
+                <p className="mt-4 text-sm leading-6 text-slate-500 sm:text-base">
+                  친구들이 알아볼 수 있는
                   <br />
-                  테스트를 만들고 링크를 공유해보세요.
+                  이름이나 닉네임을 입력해주세요.
                 </p>
               </div>
 
@@ -203,9 +291,21 @@ export default function CreatePage() {
               >
                 {loading ? "테스트를 만들고 있어요..." : "테스트 만들기"}
               </button>
+
+              {/* 메인으로 돌아가기 */}
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => router.push("/")}
+                className="mt-3 w-full py-2 text-sm font-medium text-slate-400 transition hover:text-slate-600 disabled:cursor-not-allowed"
+              >
+                ← 이전으로
+              </button>
             </>
-          ) : (
-            /* 테스트 생성 완료 후 */
+          )}
+
+          {/* 테스트 생성 완료 */}
+          {createdTest && (
             <>
               <div className="text-center">
                 <div className="mb-3 text-5xl">🎉</div>
@@ -242,7 +342,7 @@ export default function CreatePage() {
                 </button>
               </div>
 
-              {/* 결과 확인 영역 */}
+              {/* 결과 확인 */}
               <div className="mt-8 border-t border-slate-100 pt-7">
                 <div className="rounded-2xl bg-amber-50 p-5">
                   <h2 className="text-lg font-bold text-slate-900">
@@ -272,7 +372,7 @@ export default function CreatePage() {
                 </div>
               </div>
 
-              {/* 개발 중 확인용으로 결과 링크도 생성되어 있음 */}
+              {/* 개발 중 확인용 resultUrl */}
               <p className="mt-4 break-all text-center text-[11px] text-slate-300">
                 {resultUrl}
               </p>
